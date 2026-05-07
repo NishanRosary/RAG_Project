@@ -11,11 +11,20 @@ import {
   uploadDocuments,
 } from "./api";
 
+function createToast(type, title, message) {
+  return {
+    id: `${type}-${Date.now()}`,
+    type,
+    title,
+    message,
+  };
+}
+
 function App() {
   const [documents, setDocuments] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isQuerying, setIsQuerying] = useState(false);
 
@@ -28,7 +37,7 @@ function App() {
       return undefined;
     }
 
-    const timeoutId = window.setTimeout(() => setToast(""), 2600);
+    const timeoutId = window.setTimeout(() => setToast(null), 3400);
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
@@ -36,27 +45,67 @@ function App() {
     try {
       const data = await fetchDocuments();
       setDocuments(data.documents);
+
+      if (data.documents.length) {
+        setToast(
+          createToast(
+            "info",
+            "Knowledge Base Ready",
+            `${data.documents.length} document${data.documents.length === 1 ? "" : "s"} loaded from the vector store.`
+          )
+        );
+      }
     } catch (error) {
-      setToast(error.message);
+      setToast(
+        createToast(
+          "error",
+          "Backend Unavailable",
+          error.message || "Could not connect to the RAG backend."
+        )
+      );
     }
   }
 
   async function handleProcessDocuments() {
     if (!selectedFiles.length) {
-      setToast("Choose one or more documents first.");
+      setToast(
+        createToast(
+          "warning",
+          "No Files Selected",
+          "Choose one or more PDF, DOCX, TXT, or MD files before indexing."
+        )
+      );
       return;
     }
 
     setIsUploading(true);
-    setToast("Processing documents...");
+    setToast(
+      createToast(
+        "info",
+        "Indexing Started",
+        `Embedding ${selectedFiles.length} file${selectedFiles.length === 1 ? "" : "s"} into the vector database.`
+      )
+    );
 
     try {
-      await uploadDocuments(selectedFiles);
+      const result = await uploadDocuments(selectedFiles);
       setSelectedFiles([]);
       await loadDocuments();
-      setToast("Documents indexed successfully.");
+      setToast(
+        createToast(
+          "success",
+          "Documents Indexed",
+          `${result.indexed_count} document${result.indexed_count === 1 ? "" : "s"} added to the knowledge base.`
+        )
+      );
     } catch (error) {
-      setToast(error.message);
+      setToast(
+        createToast(
+          "error",
+          "Indexing Failed",
+          error.message || "The documents could not be processed."
+        )
+      );
     } finally {
       setIsUploading(false);
     }
@@ -70,26 +119,68 @@ function App() {
       setDocuments([]);
       setSelectedFiles([]);
       setMessages([]);
-      setToast("Vector store cleared.");
+      setToast(
+        createToast(
+          "success",
+          "Knowledge Base Cleared",
+          "All uploaded files, chat messages, and vector embeddings were removed."
+        )
+      );
     } catch (error) {
-      setToast(error.message);
+      setToast(
+        createToast(
+          "error",
+          "Clear Failed",
+          error.message || "The vector store could not be cleared."
+        )
+      );
     } finally {
       setIsUploading(false);
     }
   }
 
   async function handleSend(question) {
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion) {
+      setToast(
+        createToast(
+          "warning",
+          "Question Required",
+          "Type a question before sending it to the assistant."
+        )
+      );
+      return;
+    }
+
+    if (!documents.length) {
+      setToast(
+        createToast(
+          "warning",
+          "No Indexed Documents",
+          "Upload and process documents before asking questions."
+        )
+      );
+      return;
+    }
+
     const userMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: question,
+      content: trimmedQuestion,
     };
 
     setMessages((current) => [...current, userMessage]);
     setIsQuerying(true);
+    setToast(
+      createToast(
+        "info",
+        "Searching Documents",
+        "Retrieving relevant chunks and preparing a grounded answer."
+      )
+    );
 
     try {
-      const result = await queryDocuments(question);
+      const result = await queryDocuments(trimmedQuestion);
       setMessages((current) => [
         ...current,
         {
@@ -99,6 +190,13 @@ function App() {
           sources: result.sources,
         },
       ]);
+      setToast(
+        createToast(
+          "success",
+          "Answer Ready",
+          `Response generated using ${result.sources.length} source chunk${result.sources.length === 1 ? "" : "s"}.`
+        )
+      );
     } catch (error) {
       setMessages((current) => [
         ...current,
@@ -110,6 +208,13 @@ function App() {
           sources: [],
         },
       ]);
+      setToast(
+        createToast(
+          "error",
+          "Query Failed",
+          error.message || "The assistant could not answer from the current knowledge base."
+        )
+      );
     } finally {
       setIsQuerying(false);
     }
@@ -117,7 +222,7 @@ function App() {
 
   return (
     <>
-      {toast ? <Toast message={toast} /> : null}
+      <Toast toast={toast} onClose={() => setToast(null)} />
 
       <div className="shell">
         <Sidebar
