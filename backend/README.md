@@ -20,8 +20,16 @@ pip install -r requirements.txt
 3. Start the API:
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+python service.py
 ```
+
+This starts the FastAPI server on `127.0.0.1:8000` by default.
+
+Optional environment variables:
+
+- `HOST`
+- `PORT`
+- `RELOAD`
 
 ## Endpoints
 
