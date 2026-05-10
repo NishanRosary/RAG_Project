@@ -34,18 +34,6 @@ function ChatArea({ messages, hasDocuments }) {
                 {message.role === "user" ? "You" : "Assistant"}
               </div>
               <div className="message-text">{message.content}</div>
-              {message.sources?.length ? (
-                <div className="sources">
-                  {message.sources.map((source) => (
-                    <div className="source-card" key={`${source.document_id}-${source.chunk_index}`}>
-                      <div className="source-title">
-                        {source.name} · chunk {source.chunk_index}
-                      </div>
-                      <div className="source-snippet">{source.snippet}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
             </div>
           </div>
         ))}
